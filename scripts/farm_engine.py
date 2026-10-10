@@ -340,7 +340,7 @@ class FarmGame:
         need = self.required_energy(s.current_crop) if s.current_crop else 0
         lines = [
             "─" * 46,
-            f"能量池 ¥     : {s.energy_pool} kcal",
+            f"能量池       : {s.energy_pool} kcal",
             f"农资金       : ¥{s.farm_fund:.1f}",
             f"农场券池     : ¥{s.coupon_pool:.1f}",
             f"累计消费/省  : ¥{s.total_spent:.1f} / ¥{s.total_saved:.1f}",

@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -38,6 +39,28 @@ from farm_engine import (  # noqa: E402
 )
 
 STATE_PATH = Path(__file__).parent / "farm_state.json"
+
+
+def _w(s) -> int:
+    """字符串的显示宽度：全角/宽字符算 2，其余算 1。
+
+    直接用 f-string 的 <10 是按「字符个数」补空格，中文字符会少占一半宽度，
+    导致含中文的表头与数据行错位。
+    """
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+               for ch in str(s))
+
+
+def pad(s, width: int, align: str = "<") -> str:
+    """按显示宽度对齐填充，用于中文表格。"""
+    s = str(s)
+    gap = max(0, width - _w(s))
+    if align == ">":
+        return " " * gap + s
+    if align == "^":
+        left = gap // 2
+        return " " * left + s + " " * (gap - left)
+    return s + " " * gap
 
 
 def load() -> FarmGame:
@@ -85,8 +108,10 @@ def cmd_status(game: FarmGame, args) -> int:
 @guard
 def cmd_crops(game: FarmGame, args) -> int:
     unlocked = set(game.unlocked_crops())
-    print(f"{'作物':<6}{'类型':<6}{'基础能量':>10}{'食材价值':>10}{'解锁条件':<20}{'状态'}")
-    print("─" * 68)
+    cols = [("作物", 6, "<"), ("类型", 6, "<"), ("基础能量", 11, ">"),
+            ("食材价值", 10, ">"), ("解锁条件", 14, "<"), ("状态", 8, "<")]
+    print("  ".join(pad(t, w, a) for t, w, a in cols).rstrip())
+    print("─" * 62)
     for key, c in CROPS.items():
         kind = "种植" if c.kind == "plant" else "养殖"
         if c.unlock_from is None:
@@ -95,8 +120,9 @@ def cmd_crops(game: FarmGame, args) -> int:
             cond = f"收获{CROPS[c.unlock_from].name}×{c.unlock_count}"
         state = "已解锁" if key in unlocked else "未解锁"
         need = game.required_energy(key)
-        print(f"{c.name:<6}{kind:<6}{c.base_energy:>8} 卡{c.food_value:>8.1f}元{cond:<20}{state}"
-              f"  （当前实际需 {need} kcal）")
+        vals = [c.name, kind, f"{c.base_energy} kcal", f"{c.food_value:.1f} 元", cond, state]
+        row = "  ".join(pad(v, w, a) for v, (_, w, a) in zip(vals, cols)).rstrip()
+        print(f"{row}  （当前实际需 {need} kcal）")
     return 0
 
 
@@ -105,13 +131,14 @@ def cmd_tools(game: FarmGame, args) -> int:
     owned = set(game.state.tools)
     for kind, label in (("plant", "种植工具链"), ("livestock", "养殖工具链")):
         print(f"\n{label}")
-        print(f"  {'工具':<10}{'价格':>8}{'效率':>8}{'状态'}")
-        print("  " + "─" * 34)
+        print("  " + pad("工具", 12) + pad("价格", 8, ">") + pad("效率", 8, ">") + "  状态")
+        print("  " + "─" * 36)
         for key, t in TOOLS.items():
             if t.kind != kind:
                 continue
             mark = "已拥有" if key in owned else "未购买"
-            print(f"  {t.name:<10}¥{t.price:>6.0f}{-t.efficiency:>8.0%}  {mark}")
+            print("  " + pad(t.name, 12) + pad(f"¥{t.price:.0f}", 8, ">")
+                  + pad(f"-{t.efficiency:.0%}", 8, ">") + "  " + mark)
     print(f"\n种植链总效率：-{game.efficiency_for('wheat'):.0%}")
     print(f"养殖链总效率：-{game.efficiency_for('chicken'):.0%}")
     return 0
@@ -137,7 +164,8 @@ def cmd_order(game: FarmGame, args) -> int:
 
     print("订单明细")
     for it in order["items"]:
-        print(f"  {it['name']:<22} ¥{it['price']:>6.2f}（原价 ¥{it['original']:>6.2f}） {it['kcal']:>5} kcal")
+        print("  " + pad(it["name"], 24)
+              + f"¥{it['price']:>6.2f}（原价 ¥{it['original']:>6.2f}） {it['kcal']:>5} kcal")
     print("─" * 56)
     print(f"  原价合计 ¥{order['original_price']:.2f}")
     print(f"  实付合计 ¥{order['paid_price']:.2f}")
@@ -163,7 +191,7 @@ def cmd_nutrition(game: FarmGame, args) -> int:
     if args.top:
         rows = rows[:args.top]
     for name, kcal in rows:
-        print(f"  {name:<24}{kcal:>6} kcal")
+        print("  " + pad(name, 24) + f"{kcal:>5} kcal")
     return 0
 
 
