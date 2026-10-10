@@ -1,0 +1,16 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 本地游戏存档（每位玩家独立，不随仓库分发）
+farm_state.json
+scripts/farm_state.json
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
